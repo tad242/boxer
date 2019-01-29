@@ -3,7 +3,7 @@ This program creates a group of fighters, with varied skillsets,
 and uses a fighting engine to have them compete against one another.
 The user can also create their own matchups.
 
-The play-by-play is disabled for in this version.
+The play-by-play is disabled in this version.
 
 Trevor Bonner-DeWitt
 */
