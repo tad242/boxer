@@ -1,13 +1,3 @@
-/*
-This program creates a group of fighters, with varied skillsets, 
-and uses a fighting engine to have them compete against one another.
-The user can also create their own matchups.
-
-The play-by-play is enabled in this version.
-
-Trevor Bonner-DeWitt
-*/
-
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
@@ -19,11 +9,13 @@ Trevor Bonner-DeWitt
 using namespace std;
 
 int countFull = 0;
+int countUnan = 0;
+int countSplt = 0;
 
 struct Fighter
 {
 	string name;
-	int jab, hook, counter, slip, chin, speed, accuracy, recovery, health, avg, win, loss, draw;
+	int jab, hook, counter, slip, chin, speed, accuracy, recovery, health, avg, win, loss, draw, ko;
 	Fighter(void);
 	int Offense(void);
 	int Defense(void);
@@ -39,13 +31,12 @@ Fighter::Fighter()
 	speed = (rand() % 100) + 1;
 	accuracy = (rand() % 90) + 11;
 	recovery = (rand() % 90) + 11;
-	health = (rand() % 400) + 601; //arbitrary
+	health = 1000;
 	avg = (jab + hook + counter + slip + speed + accuracy + recovery) / 7;
 	win = 0;
 	loss = 0;
 	draw = 0;
-
-	//Putting fighter skill in their name, to give each fighter a unique id
+	ko = 0;
 	name = "Fighter " + to_string(Offense()) + " " + to_string(Defense());
 }
 
@@ -66,10 +57,11 @@ int Fighter::Defense()
 class Roster : public Fighter
 {
 public:
-	Fighter f[10];
+	Fighter f[20];
 	void Match(Fighter&, Fighter&);
 	bool coinflip(int);
 	void printlist(void);
+	void replace(Fighter&,Fighter&);
 };
 
 bool Roster::coinflip(int bias)
@@ -87,20 +79,31 @@ bool Roster::coinflip(int bias)
 	return coinland;
 }
 
+void Roster::replace(Fighter &oldguy, Fighter &newguy)
+{
+	//A way to add existing fighters to another roster
+	oldguy = newguy;
+}
+
 void Roster::Match(Fighter &rd, Fighter &bl)
 {
-	Fighter red, blue;
+	Fighter red, blue, win;
 	red = rd;
 	blue = bl;
 
 	bool red_d, blue_d;
 	int red_off = 0, red_def = 0, blue_off = 0, blue_def = 0, red_bias, blue_bias;
-	int strike_attempt, slip_attempt, counter_attempt;
-	int jab_hook, damage, redAttempts = 0, blueAttempts = 0, redLanded = 0, blueLanded = 0;
-	int round = 1, time = 180, prevStrikesRed = 0, prevStrikesBlue = 0, newStrikesRed = 0, newStrikesBlue = 0, roundRed = 0, roundBlue = 0;
+	int strike_attempt, slip_attempt, counter_attempt, jab_hook, damage;
+	int prevAttemptRed = 0, prevAttemptBlue = 0, newAttemptRed = 0, newAttemptBlue = 0, redAttempts = 0, blueAttempts = 0, redLanded = 0, blueLanded = 0, redDmgGiven = 0, blueDmgGiven = 0;
+	int round = 1, time = 180, decRed = 0, decBlue = 0, prevStrikesRed = 0, prevStrikesBlue = 0, newStrikesRed = 0, newStrikesBlue = 0;
+	int prevDamageRed = 0, prevDamageBlue = 0, newDamageRed = 0, newDamageBlue = 0, judgeRed[3], judgeBlue[3];
+
+	judgeRed[0] = 0, judgeBlue[0] = 0;
+	judgeRed[1] = 0, judgeBlue[1] = 0;
+	judgeRed[2] = 0, judgeBlue[2] = 0;
 
 	cout << "\n\n\n" << red.name << " vs. " << blue.name << endl;
-
+	
 	while (round < 13 && red.health > 0 && blue.health > 0)
 	{
 		cout << "\n\n~~~~~~~ ROUND " << round << " ~~~~~~~~~~~~\n";
@@ -112,12 +115,17 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 		red_def = red.Defense() - blue.Defense();
 		blue_def = blue.Defense() - red.Defense();
 
-		//Whether a fighter favors offense or defense
 		red_bias = red_off - red_def;
 		blue_bias = blue_off - blue_def;
 
+		cout << "\n\nRED BIAS: " << red_bias;
+		cout << "\n\nBLUE BIAS: " << blue_bias;
+
 		prevStrikesRed = redLanded;
 		prevStrikesBlue = blueLanded;
+
+		prevAttemptRed = redAttempts;
+		prevAttemptBlue = blueAttempts;
 
 		red.health += rand() % red.recovery;
 		blue.health += rand() % blue.recovery;
@@ -128,8 +136,16 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 		if (blue.health > bl.health)
 			blue.health = bl.health;
 
+		prevDamageRed = blue.health;
+		prevDamageBlue = red.health;
+
 		while (time > 0 && red.health > 0 && blue.health > 0)
 		{
+			cout << "\n\nRed Health remaining: " << red.health;
+			cout << "\nBlue Health remaining: " << blue.health;
+
+			damage = 0;
+
 			//Red Decision
 			if (coinflip(red_bias))
 				red_d = true;
@@ -156,7 +172,7 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 
 				redAttempts++;
 				blueAttempts++;
-
+				
 				if (coinflip(jab_hook))
 				{
 					//Blue's Jab vs Hook Preference
@@ -181,11 +197,11 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 								redLanded++;
 								blueLanded++;
 
-								damage = strike_attempt * (1 - (float)blue.chin / 100);
+								damage = strike_attempt * (1.1 - (float)blue.chin/100);
 								blue.health -= damage;
 
 								if ((counter_attempt - strike_attempt) > 0)
-									damage = (counter_attempt - strike_attempt) * (1 - (float)red.chin / 100);
+									damage = (counter_attempt - strike_attempt) * (1.1 - (float)red.chin/100);
 								else
 									damage = 0;
 
@@ -199,11 +215,11 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 								blueLanded++;
 								redLanded++;
 
-								damage = counter_attempt * (1 - (float)red.chin / 100);
+								damage = counter_attempt * (1.1 - (float)red.chin/100);
 								red.health -= damage;
 
 								if ((strike_attempt - counter_attempt) > 0)
-									damage = (strike_attempt - counter_attempt)  * (1 - (float)blue.chin / 100);
+									damage = (strike_attempt - counter_attempt)  * (1.1 - (float)blue.chin/100);
 								else
 									damage = 0;
 
@@ -214,23 +230,35 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 						}
 						else if (((rand() % 100) < red.accuracy) && ((rand() % 100) > blue.accuracy))
 						{
-							//Red makes contact, Blue misses
+							//Red is accurate, Blue misses
 							redLanded++;
+							slip_attempt = rand() % blue.slip;
 
-							damage = (strike_attempt + red.speed) * (1 - (float)blue.chin / 100);
+							if(slip_attempt < 3)
+								damage = (strike_attempt + red.speed) * ((4 - slip_attempt) - (float)blue.chin/100);
+							else
+								damage = (strike_attempt + red.speed) * (1.1 - (float)blue.chin / 100);
 							blue.health -= damage;
 							blue.speed--;
+							if (blue.health <= 0 && (slip_attempt <= 3))
+								rd.ko++;
 
 							cout << "\nRed lands a jab that rocks Blue!";
 						}
 						else if (((rand() % 100) > red.accuracy) && ((rand() % 100) < blue.accuracy))
 						{
-							//Blue makes contact, Red misses
+							//Blue is accurate, Red misses
 							blueLanded++;
+							slip_attempt = rand() % red.slip;
 
-							damage = (counter_attempt + blue.speed) * (1 - (float)red.chin / 100);
+							if (slip_attempt < 3)
+								damage = (counter_attempt + blue.speed) * ((4 - slip_attempt) - (float)red.chin/100);
+							else
+								damage = (counter_attempt + blue.speed) * (1.1 - (float)red.chin / 100);
 							red.health -= damage;
 							red.speed--;
+							if (red.health <= 0 && (slip_attempt <= 3))
+								bl.ko++;
 
 							cout << "\nBlue lands a jab that rocks Red!";
 						}
@@ -252,11 +280,11 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 								redLanded++;
 								blueLanded++;
 
-								damage = strike_attempt * (1 - (float)blue.chin / 100);
+								damage = strike_attempt * (1.1 - (float)blue.chin/100);
 								blue.health -= damage;
 
 								if ((counter_attempt - strike_attempt) > 0)
-									damage = (counter_attempt - strike_attempt) * (1 - (float)red.chin / 100);
+									damage = (counter_attempt - strike_attempt) * (1.1 - (float)red.chin/100);
 								else
 									damage = 0;
 
@@ -270,11 +298,11 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 								blueLanded++;
 								redLanded++;
 
-								damage = counter_attempt * (1 - (float)red.chin / 100);
+								damage = counter_attempt * (1.1 - (float)red.chin/100);
 								red.health -= damage;
 
 								if ((strike_attempt - counter_attempt) > 0)
-									damage = (strike_attempt - counter_attempt) * (1 - (float)blue.chin / 100);
+									damage = (strike_attempt - counter_attempt) * (1.1 - (float)blue.chin/100);
 								else
 									damage = 0;
 
@@ -287,10 +315,16 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 						{
 							//Red makes contact, Blue misses
 							redLanded++;
+							slip_attempt = rand() % blue.slip;
 
-							damage = (strike_attempt + red.speed) * (1 - (float)blue.chin / 100);
+							if (slip_attempt < 3)
+								damage = (strike_attempt + red.speed) * ((4 - slip_attempt) - (float)blue.chin / 100);
+							else
+								damage = (strike_attempt + red.speed) * (1.1 - (float)blue.chin / 100);
 							blue.health -= damage;
 							blue.speed--;
+							if (blue.health <= 0 && (slip_attempt <= 3))
+								rd.ko++;
 
 							cout << "\nRed lands a jab that rocks Blue!";
 						}
@@ -298,10 +332,17 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 						{
 							//Blue makes contact, Red misses
 							blueLanded++;
+							slip_attempt = rand() % red.slip;
 
-							damage = (counter_attempt + blue.speed) * (1 - (float)red.chin / 100);
+							if (slip_attempt < 3)
+								damage = (counter_attempt + blue.speed) * ((4 - slip_attempt) - (float)red.chin / 100);
+							else
+								damage = (counter_attempt + blue.speed) * (1.1 - (float)red.chin / 100);
 							red.health -= damage;
 							red.speed--;
+							if (red.health <= 0 && (slip_attempt <= 3))
+								bl.ko++;
+
 
 							cout << "\nBlue lands a huge hook that rocks Red!";
 						}
@@ -333,11 +374,11 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 								redLanded++;
 								blueLanded++;
 
-								damage = strike_attempt * (1 - (float)blue.chin / 100);
+								damage = strike_attempt * (1.1 - (float)blue.chin/100);
 								blue.health -= damage;
 
 								if ((counter_attempt - strike_attempt) > 0)
-									damage = (counter_attempt - strike_attempt) * (1 - (float)red.chin / 100);
+									damage = (counter_attempt - strike_attempt) * (1.1 - (float)red.chin/100);
 								else
 									damage = 0;
 
@@ -351,11 +392,11 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 								blueLanded++;
 								redLanded++;
 
-								damage = counter_attempt * (1 - (float)red.chin / 100);
+								damage = counter_attempt * (1.1 - (float)red.chin/100);
 								red.health -= damage;
 
 								if ((strike_attempt - counter_attempt) > 0)
-									damage = (strike_attempt - counter_attempt)  * (1 - (float)blue.chin / 100);
+									damage = (strike_attempt - counter_attempt)  * (1.1 - (float)blue.chin/100);
 								else
 									damage = 0;
 
@@ -368,10 +409,16 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 						{
 							//Red makes contact, Blue misses
 							redLanded++;
+							slip_attempt = rand() % blue.slip;
 
-							damage = (strike_attempt + red.speed) * (1 - (float)blue.chin / 100);
+							if (slip_attempt < 3)
+								damage = (strike_attempt + red.speed) * ((4 - slip_attempt) - (float)blue.chin / 100);
+							else
+								damage = (strike_attempt + red.speed) * (1.1 - (float)blue.chin / 100);
 							blue.health -= damage;
 							blue.speed--;
+							if (blue.health <= 0 && (slip_attempt <= 3))
+								rd.ko++;
 
 							cout << "\nRed lands a huge hook that rocks Blue!";
 						}
@@ -379,10 +426,16 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 						{
 							//Blue makes contact, Red misses
 							blueLanded++;
+							slip_attempt = rand() % red.slip;
 
-							damage = (counter_attempt + blue.speed) * (1 - (float)red.chin / 100);
+							if (slip_attempt < 3)
+								damage = (counter_attempt + blue.speed) * ((4 - slip_attempt) - (float)red.chin / 100);
+							else
+								damage = (counter_attempt + blue.speed) * (1.1 - (float)red.chin / 100);
 							red.health -= damage;
 							red.speed--;
+							if (red.health <= 0 && (slip_attempt <= 3))
+								bl.ko++;
 
 							cout << "\nBlue lands a jab that rocks Red!";
 						}
@@ -404,11 +457,11 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 								redLanded++;
 								blueLanded++;
 
-								damage = strike_attempt * (1 - (float)blue.chin / 100);
+								damage = strike_attempt * (1.1 - (float)blue.chin/100);
 								blue.health -= damage;
 
 								if ((counter_attempt - strike_attempt) > 0)
-									damage = (counter_attempt - strike_attempt) * (1 - (float)red.chin / 100);
+									damage = (counter_attempt - strike_attempt) * (1.1 - (float)red.chin/100);
 								else
 									damage = 0;
 
@@ -422,11 +475,11 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 								blueLanded++;
 								redLanded++;
 
-								damage = counter_attempt * (1 - (float)red.chin / 100);
+								damage = counter_attempt * (1.1 - (float)red.chin/100);
 								red.health -= damage;
 
 								if ((strike_attempt - counter_attempt) > 0)
-									damage = (strike_attempt - counter_attempt) * (1 - (float)blue.chin / 100);
+									damage = (strike_attempt - counter_attempt) * (1.1 - (float)blue.chin/100);
 								else
 									damage = 0;
 
@@ -439,10 +492,16 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 						{
 							//Red makes contact, Blue misses
 							redLanded++;
+							slip_attempt = rand() % blue.slip;
 
-							damage = (strike_attempt + red.speed) * (1 - (float)blue.chin / 100);
+							if (slip_attempt < 3)
+								damage = (strike_attempt + red.speed) * ((4 - slip_attempt) - (float)blue.chin / 100);
+							else
+								damage = (strike_attempt + red.speed) * (1.1 - (float)blue.chin / 100);
 							blue.health -= damage;
 							blue.speed--;
+							if (blue.health <= 0 && (slip_attempt <= 3))
+								rd.ko++;
 
 							cout << "\nRed lands a huge hook that rocks Blue!";
 						}
@@ -450,10 +509,16 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 						{
 							//Blue makes contact, Red misses
 							blueLanded++;
+							slip_attempt = rand() % red.slip;
 
-							damage = (counter_attempt + blue.speed) * (1 - (float)red.chin / 100);
+							if (slip_attempt < 3)
+								damage = (counter_attempt + blue.speed) * ((4 - slip_attempt) - (float)red.chin / 100);
+							else
+								damage = (counter_attempt + blue.speed) * (1.1 - (float)red.chin / 100);
 							red.health -= damage;
 							red.speed--;
+							if (red.health <= 0 && (slip_attempt <= 3))
+								bl.ko++;
 
 							cout << "\nBlue lands a huge hook that rocks Red!";
 						}
@@ -477,33 +542,56 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 				if (coinflip(jab_hook))
 				{
 					//Red Jab
-					strike_attempt = (rand() % red.jab) + red.speed;
-					slip_attempt = (rand() % blue.slip) + blue.speed;
-					counter_attempt = (rand() % blue.counter);
+					strike_attempt = (rand() % red.jab);
+					slip_attempt = rand() % blue.slip;
+					counter_attempt = rand() % blue.counter;
 
-					if ((strike_attempt > slip_attempt) && ((rand() % 100) < red.accuracy))
+					if ((strike_attempt + red.speed > slip_attempt + blue.speed) && ((rand() % 100) < red.accuracy))
 					{
-						cout << "\nRed lands with the jab!" << endl;
-						damage = (strike_attempt - slip_attempt) * (1 - (float)blue.chin / 100);
+						if ((slip_attempt < 3) && (strike_attempt + red.speed > red.jab))
+						{
+							cout << "\nRed lands a big jab and Blue is hurt!" << endl;
+							damage = strike_attempt  * ((4 - slip_attempt) - (float)blue.chin / 100);
+							blue.speed--;
+						}
+						else
+						{
+							cout << "\nRed lands with the jab!" << endl;
+							damage = (strike_attempt) * (1.1 - (float)blue.chin / 100);
+						}
 						blue.health -= damage;
 						redLanded++;
+						cout << "\nDAMAGE: " << damage << endl;
+						if (blue.health <= 0 && (slip_attempt <= 3))
+							rd.ko++;
 					}
-					else if (slip_attempt > (strike_attempt))
+					else if (slip_attempt + blue.speed > (strike_attempt * 2) + red.speed)
 					{
 						cout << "\nBlue slips a jab";
-						damage = counter_attempt * (1 - (float)red.chin / 100);
 						blueAttempts++;
-						if (damage > 0)
+						if (strike_attempt < 3)
 						{
-							if ((rand() % 100) <= blue.accuracy)
-							{
-								red.health -= damage;
-								blueLanded++;
-								cout << " and counters";
-							}
-
+							cout << "\n and responds with a hard counter, Red is in trouble";
+							damage = counter_attempt * ((4 - strike_attempt) - (float)red.chin / 100);
+							red.health -= damage;
+							red.speed--;
+							blueLanded++;
 						}
+						else if ((rand() % 100) <= blue.accuracy)
+						{
+							cout << " and counters";
+							damage = counter_attempt * (1.1 - (float)red.chin / 100);
+							red.health -= damage;
+							blueLanded++;
+						}
+
+						
+						if (red.health <= 0 && (strike_attempt <= 3))
+							bl.ko++;
+						
+
 						cout << "!" << endl;
+						cout << "\nDAMAGE: " << damage << endl;
 					}
 					else
 					{
@@ -515,32 +603,55 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 				else
 				{
 					//Red Hook
-					strike_attempt = (rand() % red.hook) + red.speed;
-					slip_attempt = (rand() % blue.slip) + blue.speed;
+					strike_attempt = (rand() % red.hook);
+					slip_attempt = (rand() % blue.slip);
 					counter_attempt = (rand() % blue.counter);
 
-					if ((strike_attempt > slip_attempt) && (rand() % 100) < red.accuracy)
+					if ((strike_attempt + red.speed > slip_attempt + blue.speed) && ((rand() % 100) < red.accuracy))
 					{
-						cout << "\nRed lands with the hook!" << endl;
-						damage = (strike_attempt - slip_attempt) * (1 - (float)blue.chin / 100);
+						if ((slip_attempt < 3) && (strike_attempt + red.speed > red.hook))
+						{
+							cout << "\nRed lands a huge hook and Blue is hurt!" << endl;
+							damage = strike_attempt * ((4 - slip_attempt) - (float)blue.chin / 100);
+							blue.speed--;
+						}
+						else
+						{
+							cout << "\nRed lands with the hook!" << endl;
+							damage = (strike_attempt) * (1.1 - (float)blue.chin / 100);
+						}
 						blue.health -= damage;
 						redLanded++;
+						cout << "\nDAMAGE: " << damage << endl;
+						if (blue.health <= 0 && (slip_attempt <= 3))
+							rd.ko++;
 					}
-					else if (slip_attempt > (strike_attempt * 2))
+					else if (slip_attempt + blue.speed > (strike_attempt * 2) + red.speed)
 					{
 						cout << "\nBlue slips a hook";
-						damage = counter_attempt * (1 - (float)red.chin / 100);
 						blueAttempts++;
-						if (damage > 0)
+						if (strike_attempt < 3)
 						{
-							if ((rand() % 100) <= blue.accuracy)
-							{
-								red.health -= damage;
-								blueLanded++;
-								cout << " and counters";
-							}
+							cout << "\n and responds with a hard counter, Red is in trouble";
+							damage = counter_attempt * ((4 - strike_attempt) - (float)red.chin / 100);
+							red.health -= damage;
+							red.speed--;
+							blueLanded++;
 						}
+						else if ((rand() % 100) <= blue.accuracy)
+						{
+							cout << " and counters";
+							damage = counter_attempt * (1.1 - (float)red.chin / 100);
+							red.health -= damage;
+							blueLanded++;
+						}
+
+
+						if (red.health <= 0 && (strike_attempt <= 3))
+							bl.ko++;
+
 						cout << "!" << endl;
+						cout << "\nDAMAGE: " << damage << endl;
 					}
 					else
 					{
@@ -565,32 +676,55 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 				if (coinflip(jab_hook))
 				{
 					//Blue Jab
-					strike_attempt = (rand() % blue.jab) + blue.speed;
-					slip_attempt = (rand() % red.slip) + red.speed;
+					strike_attempt = (rand() % blue.jab);
+					slip_attempt = (rand() % red.slip);
 					counter_attempt = (rand() % red.counter);
 
-					if ((strike_attempt > slip_attempt) && (rand() % 100) < blue.accuracy)
+					if ((strike_attempt + blue.speed > slip_attempt + red.speed) && ((rand() % 100) < blue.accuracy))
 					{
-						cout << "\nBlue lands with the jab!" << endl;
-						damage = (strike_attempt - slip_attempt) * (1 - (float)red.chin / 100);
+						if ((slip_attempt < 3) && (strike_attempt + blue.speed > blue.jab))
+						{
+							cout << "\nBlue lands a big jab and Red is hurt!" << endl;
+							damage = strike_attempt * ((4 - slip_attempt) - (float)red.chin / 100);
+							red.speed--;
+						}
+						else
+						{
+							cout << "\nBlue lands with the jab!" << endl;
+							damage = (strike_attempt) * (1.1 - (float)red.chin / 100);
+						}
 						red.health -= damage;
 						blueLanded++;
+						cout << "\nDAMAGE: " << damage << endl;
+						if (red.health <= 0 && (slip_attempt <= 3))
+							bl.ko++;
 					}
-					else if (slip_attempt > (strike_attempt * 2))
+					else if (slip_attempt + red.speed > (strike_attempt * 2) + blue.speed)
 					{
 						cout << "\nRed slips a jab";
-						damage = counter_attempt * (1 - (float)blue.chin / 100);
 						redAttempts++;
-						if (damage > 0)
+						if (strike_attempt < 3)
 						{
-							if ((rand() % 100) <= red.accuracy)
-							{
-								blue.health -= damage;
-								redLanded++;
-								cout << " and counters";
-							}
+							cout << "\n and responds with a hard counter, Blue is in trouble";
+							damage = counter_attempt * ((4 - strike_attempt) - (float)blue.chin / 100);
+							blue.health -= damage;
+							blue.speed--;
+							redLanded++;
 						}
+						else if ((rand() % 100) <= red.accuracy)
+						{
+							cout << " and counters";
+							damage = counter_attempt * (1.1 - (float)blue.chin / 100);
+							blue.health -= damage;
+							redLanded++;
+						}
+
+
+						if (blue.health <= 0 && (strike_attempt <= 3))
+							rd.ko++;
+
 						cout << "!" << endl;
+						cout << "\nDAMAGE: " << damage << endl;
 					}
 					else
 					{
@@ -603,33 +737,55 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 				else
 				{
 					//Blue Hook
-					strike_attempt = (rand() % blue.hook) + blue.speed;
-					slip_attempt = (rand() % red.slip) + red.speed;
+					strike_attempt = (rand() % blue.hook);
+					slip_attempt = (rand() % red.slip);
 					counter_attempt = (rand() % red.counter);
 
 
-					if ((strike_attempt > slip_attempt) && (rand() % 100) < blue.accuracy)
+					if ((strike_attempt + blue.speed > slip_attempt + red.speed) && ((rand() % 100) < blue.accuracy))
 					{
-						cout << "\nBlue lands with the hook!" << endl;
-						damage = (strike_attempt - slip_attempt) * (1 - (float)red.chin / 100);
+						if ((slip_attempt < 3) && (strike_attempt + blue.speed > blue.hook))
+						{
+							cout << "\nBlue lands a huge hook and Red is hurt!" << endl;
+							damage = strike_attempt * ((4 - slip_attempt) - (float)red.chin / 100);
+							red.speed--;
+						}
+						else
+						{
+							cout << "\nBlue lands with the hook!" << endl;
+							damage = (strike_attempt) * (1.1 - (float)red.chin / 100);
+						}
 						red.health -= damage;
 						blueLanded++;
+						cout << "\nDAMAGE: " << damage << endl;
+						if (red.health <= 0 && (slip_attempt <= 3))
+							bl.ko++;
 					}
-					else if (slip_attempt > (strike_attempt * 2))
+					else if (slip_attempt + red.speed > (strike_attempt * 2) + blue.speed)
 					{
 						cout << "\nRed slips a hook";
-						damage = counter_attempt * (1 - (float)blue.chin / 100);
 						redAttempts++;
-						if (damage > 0)
+						if (strike_attempt < 3)
 						{
-							if ((rand() % 100) <= red.accuracy)
-							{
-								blue.health -= damage;
-								redLanded++;
-								cout << " and counters";
-							}
+							cout << "\n and responds with a hard counter, Blue is in trouble";
+							damage = counter_attempt * ((4 - strike_attempt) - (float)blue.chin / 100);
+							blue.health -= damage;
+							blue.speed--;
+							redLanded++;
 						}
+						else if ((rand() % 100) <= red.accuracy)
+						{
+							cout << " and counters";
+							damage = counter_attempt * (1.1 - (float)blue.chin / 100);
+							blue.health -= damage;
+							redLanded++;
+						}
+
+						if (blue.health <= 0 && (strike_attempt <= 3))
+							rd.ko++;
+
 						cout << "!" << endl;
+						cout << "\nDAMAGE: " << damage << endl;
 					}
 					else
 					{
@@ -645,17 +801,37 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 				cout << "\nBoth fighters pause and look for an opening.\n";
 
 			}
-			time -= (rand() % 12) + 2; //every event takes 2 seconds minimum
-			cout << "\nTIME REMAINING: " << max(0, time) << " seconds.\n";
+		time -= (rand() % 12) + 1;
+		cout << "\nTIME REMAINING: " << max(0,time) << " seconds.\n";
 		}
+
+		newAttemptRed = redAttempts - prevAttemptRed;
+		newAttemptBlue = blueAttempts - prevAttemptBlue;
 
 		newStrikesRed = redLanded - prevStrikesRed;
 		newStrikesBlue = blueLanded - prevStrikesBlue;
 
+		newDamageRed = prevDamageRed - blue.health;
+		newDamageBlue = prevDamageBlue - red.health;
+
 		if (newStrikesRed > newStrikesBlue)
-			roundRed++;
+			judgeRed[0]++;
 		else if (newStrikesBlue > newStrikesRed)
-			roundBlue++;
+			judgeBlue[0]++;
+
+		if (newDamageRed > newDamageBlue)
+			judgeRed[1]++;
+		else if (newDamageBlue > newDamageRed)
+			judgeBlue[1]++;
+
+		if ((newDamageRed / (newStrikesRed + 1)) > (newDamageBlue / (newStrikesBlue + 1)))
+			judgeRed[2]++;
+		else if ((newDamageBlue / (newStrikesBlue + 1)) > (newDamageRed / (newStrikesRed + 1)))
+			judgeBlue[2]++;
+		else if (newAttemptRed > newAttemptBlue)
+			judgeBlue[2]++;
+		else
+			judgeRed[2]++;
 
 		round++;
 	}
@@ -679,46 +855,105 @@ void Roster::Match(Fighter &rd, Fighter &bl)
 	else
 	{
 		countFull++;
-		cout << "After 12 Rounds, we go to the judges. The judges score the contest "
-			<< max(roundRed, roundBlue) << " to " << min(roundRed, roundBlue);
+		cout << "After 12 Rounds, we go to the judges.\n\n";
 
-		if (roundRed > roundBlue)
+		for (int q = 0; q < 3; q++)
 		{
-			cout << ", for the WINNER by UNANIMOUS DECISION...\n\n" << red.name << " of the RED CORNER!\n"
-				<< "Loser: " << blue.name;
+			if (judgeRed[q] > judgeBlue[q])
+				decRed++;
+			else if (judgeBlue[q] > judgeRed[q])
+				decBlue++;
+		}
+
+		if (decRed + decBlue <= 1 || (decRed == decBlue))
+		{
+			rd.draw++;
+			bl.draw++;
+		}
+		else if (decRed > decBlue)
+		{
 			rd.win++;
 			bl.loss++;
+			win = red;
 		}
-		else if (roundBlue > roundRed)
+			
+		else if (decBlue > decRed)
 		{
-			cout << ", for the WINNER by UNANIMOUS DECISION...\n\n" << blue.name << " of the BLUE CORNER!\n"
-				<< "Loser: " << red.name;
 			bl.win++;
 			rd.loss++;
+			win = blue;
+		}
+	
+
+		if (decRed == 2 || decBlue == 2)
+		{
+			for(int w = 0;w<3;w++)
+			{
+				cout << "\nJudge " << w + 1 << " scores the contest "
+					<< max(judgeRed[w], judgeBlue[w]) << " to " << min(judgeRed[w], judgeBlue[w]);
+				if (max(judgeRed[w], judgeBlue[w]) == judgeRed[w])
+					cout << " for " << red.name;
+				else if (max(judgeRed[w], judgeBlue[w]) == judgeBlue[w])
+					cout << " for " << blue.name;
+				else
+					cout << " even";
+			}
+
+			cout << "\n\nMaking your winner,";
+
+			if (decRed + decBlue == 3)
+			{
+				cout << " by SPLIT decision, ";
+				countSplt++;
+			}
+			else
+				cout << " by MAJORITY decision ";
+
+			cout << win.name << "!\n\n";
+		}
+		else if (decRed == 3 || decBlue == 3)
+		{
+
+			cout << ", all for the WINNER by UNANIMOUS decision...\n\n" << win.name << "!\n";
+		}
+		else if (decRed + decBlue == 0)
+		{
+			countUnan++;
+			cout << ".\nLadies and gentleman...\nWE HAVE A UNANIMOUS DRAW!\n";
+		}
+		else if (decRed + decBlue == 1)
+		{
+			countUnan++;
+			cout << ".\nLadies and gentleman...\WE HAVE A MAJORITY DRAW!\n";
+		}
+		else if (decRed == 1 && decBlue == 1)
+		{
+			countUnan++;
+			cout << ".\nLadies and gentleman...\WE HAVE A SPLIT DRAW!\n";
 		}
 		else
 		{
-			cout << ".\nLadies and gentleman...\nTHIS MATCH IS A DRAW!\n";
-			rd.draw++;
-			bl.draw++;
-			countFull++;
+			cout << "\n\nERROR\n" << "decRed = " << decRed << "\ndecBlue = " << decBlue;
+			system("pause");
+		}
 		}
 	}
-
-
 }
+		
+
+
 
 void Roster::printlist(void)
 {
 	int i;
 
-	for (i = 0; i <= 9; i++)
+	for (i = 0; i <= 19; i++)
 	{
-		cout << "\n\n" << i + 1 << ": " << f[i].name;
-		cout << "\n(" << f[i].win << " - " << f[i].loss << " - " << f[i].draw << ")\n";
+		cout << "\n" << i+1 << ": " << f[i].name;
+		cout << "\n(" << f[i].win << " - " << f[i].loss << " - " << f[i].draw << ", " << f[i].ko << " KOs)\n";
 		cout << "\nJab: " << f[i].jab << "\nHook: " << f[i].hook << "\nCounter: " << f[i].counter << "\nSlip: "
-			<< f[i].slip << "\nChin: " << f[i].chin << "\nSpeed: " << f[i].speed << "\nAccuracy: " << f[i].accuracy
-			<< "\nRecovery: " << f[i].recovery << "\nHealth: " << f[i].health << endl;
+			<< f[i].slip << "\nChin: " << f[i].chin << "\nSpeed: " << f[i].speed << "\nAccuracy: " << f[i].accuracy << "\nRecovery: " << f[i].recovery
+			<< "\nHealth: " << f[i].health << endl;
 	}
 }
 
@@ -727,42 +962,79 @@ main()
 {
 	srand(GetTickCount());
 
-	int r = 10, b = 10, i = 0, j = 0;
+	// "Champion" Roster
+	Roster champs;
+	int r = 20, b = 20, i = 0, j = 0, k = 0, l = 0, m = 0, n = 0;
+	bool yep = false;
 
-	//Create New Roster
-	Roster boxer;
-
-	//Everybody on the roster fights everyone else
-	j = 0;
-	while (j < 10)
+	while (l < 20)
 	{
-		for (i = j; i <= 9; i++)
-			if (i != j)
-				boxer.Match(boxer.f[i], boxer.f[j]);
+		//Create New Roster
+		Roster test;
+		
+		//Everybody on the roster fights everyone else
+		j = 0;
+		while (j < 20)
+		{
+			for (i = j; i <= 19; i++)
+				if (i != j)
+					test.Match(test.f[i], test.f[j]);
 
-		j++;
+			j++;
+		}
+
+		//If fighter is undefeated, add to "Champion" roster
+		for (k = 0; k < 20; k++)
+		{
+			if (test.f[k].win == 0)
+			{
+				champs.replace(champs.f[l], test.f[k]);
+				l++;
+			}
+
+		}
+		
 	}
 
-	while (r != 0 && b != 0)
+
+	//play Champs against one another
+	while (m < 20)
 	{
-		boxer.printlist();
+		for (n = m; n <= 19; n++)
+			if (n != m)
+				champs.Match(champs.f[n], champs.f[m]);
+		m++;
+	}
 
-		cout << "\nPress 0 to quit\n";
+		while (r != 0 && b != 0)
+		{
+			champs.printlist();
 
-		cout << "\nPlease select the fighter in the Red corner:\n";
-		cin >> r;
-		if (r == 0)
-			break;
+			cout << endl << countFull << " full-distance matches.\n";
+			cout << countSplt << " split decisions.\n";
+			cout << countUnan << " draws.\n";
 
-		cout << "\nPlease select a fighter in the Blue corner:\n";
-		cin >> b;
-		while (r == b)
+			cout << "\nPress 0 to quit\n";
+
+			cout << "\nPlease select the fighter in the Red corner:\n";
+			cin >> r;
+			if (r == 0)
+				break;
+
+			cout << "\nPlease select a fighter in the Blue corner:\n";
 			cin >> b;
-		if (b == 0)
-			break;
+			while (r == b)
+				cin >> b;
+			if (b == 0)
+				break;
 
-		boxer.Match(boxer.f[r - 1], boxer.f[b - 1]);
-	}
+			champs.Match(champs.f[r - 1], champs.f[b - 1]);
+		}
+
+	
+	
+
+
 
 	system("pause");
 }
